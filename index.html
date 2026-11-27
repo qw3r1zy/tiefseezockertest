@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Papierkugel-Arena (PvP Schleuder)</title>
+    <style>
+        body { margin: 0; background: #1a1a1a; color: #fff; font-family: sans-serif; overflow: hidden; }
+        canvas { display: block; background: #222; }
+        #ui { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); }
+        button { padding: 12px 24px; font-size: 18px; background: #ffcc00; border: none; cursor: pointer; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <button id="chargeBtn">Schleuder aufladen & Schießen</button>
+    </div>
+    <canvas id="gameCanvas"></canvas>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let charge = 0;
+        let isCharging = false;
+        let paperBalls = [];
+
+        document.getElementById('chargeBtn').addEventListener('mousedown', () => { isCharging = true; charge = 0; });
+        document.addEventListener('mouseup', () => {
+            if (isCharging) {
+                paperBalls.push({ x: 100, y: canvas.height - 100, vx: charge * 0.5, vy: -charge * 0.4 });
+                isCharging = false;
+                charge = 0;
+            }
+        });
+
+        function loop() {
+            if (isCharging) charge += 0.5;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Flugbahn Vorschau
+            if (isCharging) {
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)I';
+                ctx.beginPath();
+                ctx.moveTo(100, canvas.height - 100);
+                ctx.lineTo(100 + charge * 20, (canvas.height - 100) - charge * 15);
+                ctx.stroke();
+            }
+
+            // Papierkugeln updaten
+            paperBalls.forEach((b, index) => {
+                b.x += b.vx;
+                b.y += b.vy;
+                b.vy += 0.2; // Schwerkraft
+                ctx.fillStyle = '#fff';
+                ctx.beginPath();
+                ctx.arc(b.x, b.y, 6, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            requestAnimationFrame(loop);
+        }
+        loop();
+    </script>
+</body>
+</html>
