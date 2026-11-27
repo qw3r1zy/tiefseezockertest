@@ -2,17 +2,20 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <title>Papierkugel-Arena (PvP Schleuder)</title>
+    <title>Papierkugel-Arena (3D PvP Schleuder)</title>
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <style>
         body { margin: 0; background: #1a1a1a; color: #fff; font-family: sans-serif; overflow: hidden; }
-        canvas { display: block; background: #222; }
-        #ui { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); }
-        button { padding: 12px 24px; font-size: 18px; background: #ffcc00; border: none; cursor: pointer; font-weight: bold; }
+        canvas { display: block; background: linear-gradient(to bottom, #333, #111); }
+        #ui { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); text-align: center; }
+        button { padding: 14px 28px; font-size: 18px; background: #ffcc00; border: none; cursor: pointer; font-weight: bold; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        #peer-info { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 8px; font-size: 14px; }
     </style>
 </head>
 <body>
+    <div id="peer-info">ID: <span id="myId">...</span><br><input id="peerIdInput" placeholder="ID"><button id="connectBtn">Verbinden</button></div>
     <div id="ui">
-        <button id="chargeBtn">Schleuder aufladen & Schießen</button>
+        <button id="chargeBtn">Schleuder aufladen & Schießen (3D)</button>
     </div>
     <canvas id="gameCanvas"></canvas>
     <script>
@@ -24,38 +27,74 @@
         let charge = 0;
         let isCharging = false;
         let paperBalls = [];
+        const peer = new Peer();
+        let conn = null;
+
+        peer.on('open', id => document.getElementById('myId').innerText = id);
+        peer.on('connection', c => { conn = c; setupConn(); });
+        document.getElementById('connectBtn').onclick = () => {
+            conn = peer.connect(document.getElementById('peerIdInput').value);
+            setupConn();
+        };
+
+        function setupConn() {
+            conn.on('data', data => {
+                if(data.type === 'shot') {
+                    paperBalls.push({ x: canvas.width - data.x, y: data.y, vx: -data.vx, vy: data.vy, remote: true });
+                }
+            });
+        }
 
         document.getElementById('chargeBtn').addEventListener('mousedown', () => { isCharging = true; charge = 0; });
         document.addEventListener('mouseup', () => {
             if (isCharging) {
-                paperBalls.push({ x: 100, y: canvas.height - 100, vx: charge * 0.5, vy: -charge * 0.4 });
+                let vx = charge * 0.6;
+                let vy = -charge * 0.5;
+                paperBalls.push({ x: 100, y: canvas.height - 150, vx: vx, vy: vy, remote: false });
+                if(conn && conn.open) {
+                    conn.send({ type: 'shot', x: 100, y: canvas.height - 150, vx: vx, vy: vy });
+                }
                 isCharging = false;
                 charge = 0;
             }
         });
 
         function loop() {
-            if (isCharging) charge += 0.5;
+            if (isCharging) charge = Math.min(charge + 0.6, 30);
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Flugbahn Vorschau
             if (isCharging) {
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)I';
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+                ctx.lineWidth = 3;
                 ctx.beginPath();
-                ctx.moveTo(100, canvas.height - 100);
-                ctx.lineTo(100 + charge * 20, (canvas.height - 100) - charge * 15);
+                let simX = 100, simY = canvas.height - 150;
+                let simVx = charge * 0.6;
+                let simVy = -charge * 0.5;
+                ctx.moveTo(simX, simY);
+                for(let i=0; i<30; i++) {
+                    simX += simVx;
+                    simY += simVy;
+                    simVy += 0.3;
+                    ctx.lineTo(simX, simY);
+                }
                 ctx.stroke();
             }
 
-            // Papierkugeln updaten
-            paperBalls.forEach((b, index) => {
+            ctx.fillStyle = '#8B4513';
+            ctx.fillRect(80, canvas.height - 150, 20, 100);
+
+            paperBalls.forEach((b) => {
                 b.x += b.vx;
                 b.y += b.vy;
-                b.vy += 0.2; // Schwerkraft
-                ctx.fillStyle = '#fff';
+                b.vy += 0.3;
+                
+                ctx.fillStyle = b.remote ? '#ff6666' : '#ffffff';
                 ctx.beginPath();
-                ctx.arc(b.x, b.y, 6, 0, Math.PI * 2);
+                ctx.arc(b.x, b.y, 8, 0, Math.PI * 2);
                 ctx.fill();
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
             });
 
             requestAnimationFrame(loop);
